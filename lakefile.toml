@@ -1,0 +1,10 @@
+name = "program-verifications"
+version = "0.1.0"
+defaultTargets = ["program-verifications"]
+
+[[lean_lib]]
+name = "ProgramVerifications"
+
+[[lean_exe]]
+name = "program-verifications"
+root = "Main"
