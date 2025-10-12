@@ -307,6 +307,15 @@ theorem coinExchanges_zero {coins : List Nat} {amount : Nat} (eq : amount = 0) :
 theorem coinExchanges_zero' {coins : List Nat} : coinExchanges coins 0 = {0} := coinExchanges_zero rfl
 
 @[simp, grind]
+theorem coinExchanges_nil_not_zero {amount : Nat} (h : amount ≠ 0) : coinExchanges [] amount = {} := by
+  simp [coinExchanges, h]
+
+@[simp, grind]
+theorem coinExchanges_cons_zero {coins : List Nat} {amount : Nat} :
+  coinExchanges (0 :: coins) amount = coinExchanges coins amount := by
+  simp [coinExchanges]
+
+@[simp, grind]
 theorem coinExchanges_cons_gt {coin : Nat} {coins : List Nat} {amount : Nat} (gt : coin > amount) :
   coinExchanges (coin :: coins) amount = coinExchanges coins amount := by
   conv =>
@@ -364,3 +373,138 @@ theorem mem_coinExchanges_iff_isSolution {coins : List Nat} {amount : Nat} {exch
   (hz : ∀ c ∈ coins, c ≠ 0) :
   exchange ∈ coinExchanges coins amount ↔ IsSolution coins amount exchange :=
   ⟨isSolution_of_mem_coinExchanges hz, mem_coinExchanges_of_isSolution hz⟩
+
+def minOption {α} [LinearOrder α] (a : Option α) (b : Option α) : Option α :=
+  match a, b with
+  | .some a, .some b => .some (min a b)
+  | .some a, .none => .some a
+  | .none, .some b => .some b
+  | .none, .none => .none
+
+theorem minOption_eq_none_iff_none {α} [LinearOrder α] (a : Option α) (b : Option α) :
+  minOption a b = .none ↔ a = .none ∧ b = .none := by
+  fun_cases minOption a b <;> grind
+
+def minimumExchangeCount (coins : List Nat) (amount : Nat) : Option Nat :=
+  match coins with
+  | [] => if amount = 0 then .some 0 else .none
+  | coin :: coins =>
+    if h : coin = 0 || coin > amount then
+      minimumExchangeCount coins amount
+    else
+      have : amount - coin < amount := by grind
+      let countWith := minimumExchangeCount (coin :: coins) (amount - coin) |>.map Nat.succ
+      let countWithout := minimumExchangeCount coins amount
+      minOption countWith countWithout
+termination_by (coins, amount)
+
+theorem minimumExchangeCount_eq_none_iff_coinExchanges_eq_empty {coins : List Nat} {amount : Nat} :
+  minimumExchangeCount coins amount = .none ↔ coinExchanges coins amount = {} := by
+  fun_induction minimumExchangeCount coins amount
+  next => simp
+  next => grind
+  next amount coin coins h ih =>
+    simp only [gt_iff_lt, Bool.or_eq_true, decide_eq_true_eq] at h
+    grind
+  next amount coin coins h _ countWith countWithout ihWith ihWithout =>
+    simp only [gt_iff_lt, Bool.or_eq_true, decide_eq_true_eq, not_or, not_lt] at h
+    simp [minOption_eq_none_iff_none, coinExchanges_cons_of_not_zero_of_le h.1 h.2, countWith, countWithout, ihWith, ihWithout]
+
+theorem minimumExchangeCount_eq_some_iff_minimal {coins : List Nat} {amount : Nat} {count : Nat} :
+  minimumExchangeCount coins amount = .some count ↔ ∃ exchange ∈ coinExchanges coins amount, exchange.card = count ∧ ∀ exchange' ∈ coinExchanges coins amount, count ≤ exchange'.card := by
+  fun_induction minimumExchangeCount coins amount generalizing count
+  next => simp_all
+  next amount h => simp [h]
+  next amount coin coins h ih =>
+    simp only [gt_iff_lt, Bool.or_eq_true, decide_eq_true_eq] at h
+    grind
+  next amount coin coins h _ countWith countWithout ihWith ihWithout =>
+    simp only [gt_iff_lt, Bool.or_eq_true, decide_eq_true_eq, not_or, not_lt] at h
+    match hw : countWith, hwo : countWithout with
+    | .some cw, .some cwo =>
+      simp only [Option.map_eq_some_iff, ihWith, Nat.succ_eq_add_one, countWith] at hw
+      simp only [ihWithout, countWithout] at hwo
+      obtain ⟨n, hw, eqw⟩ := hw
+      obtain ⟨ew, hw, eqw', minw⟩ := hw
+      obtain ⟨ewo, hwo, eqwo, minwo⟩ := hwo
+      subst cw cwo n
+      simp [coinExchanges_cons_of_not_zero_of_le h.1 h.2, minOption]
+      refine ⟨?_, ?_⟩
+      . intro eq
+        cases Nat.le_or_ge (ew.card + 1) ewo.card with
+        | inl le =>
+          rw [min_eq_left le] at eq
+          refine ⟨coin ::ₘ ew, by simp [hw], by simp [←eq], ?_⟩
+          intro exchange' mem
+          cases mem with
+          | inl mem =>
+            obtain ⟨exchange'', mem'', eq''⟩ := mem
+            subst exchange'
+            simpa [←eq] using minw exchange'' mem''
+          | inr mem => grind
+        | inr ge =>
+          rw [min_eq_right ge] at eq
+          refine ⟨ewo, by simp [hwo], eq, ?_⟩
+          intro exchange' mem
+          cases mem with
+          | inl mem =>
+            obtain ⟨exchange'', mem'', eq''⟩ := mem
+            subst exchange'
+            simp only [← eq, Multiset.card_cons]
+            exact Nat.le_trans ge (by grind)
+          | inr mem => grind
+      . intro h'
+        obtain ⟨exchange, mem, eq, hmin⟩ := h'
+        cases mem with
+        | inl mem =>
+          obtain ⟨exchange', mem', eq'⟩ := mem
+          subst exchange count
+          have eqw : ew.card = exchange'.card := by
+            refine Nat.le_antisymm ?_ ?_
+            . grind
+            . have := hmin (coin ::ₘ ew) (.inl (by grind))
+              simpa
+          have ltwo : exchange'.card < ewo.card := by
+            have := hmin ewo (.inr hwo)
+            simpa
+          simpa [eqw] using ltwo
+        | inr mem =>
+          subst count
+          have lew : exchange.card ≤ ew.card + 1 := by
+            have := hmin (coin ::ₘ ew) (.inl (by grind))
+            simpa
+          have eqwo : ewo.card = exchange.card := by
+            refine Nat.le_antisymm ?_ ?_
+            . grind
+            . have := hmin ewo (.inr hwo)
+              simpa
+          simpa [eqwo] using lew
+    | .some cw, .none =>
+      simp only [Option.map_eq_some_iff, ihWith, Nat.succ_eq_add_one, countWith] at hw
+      simp only [minimumExchangeCount_eq_none_iff_coinExchanges_eq_empty, countWithout] at hwo
+      simp only [minOption, Option.some.injEq, coinExchanges_cons_of_not_zero_of_le h.1 h.2, hwo,
+        Finset.union_empty, Finset.mem_image, forall_exists_index, and_imp,
+        forall_apply_eq_imp_iff₂, Multiset.card_cons, exists_exists_and_eq_and]
+      grind
+    | .none, .some cwo =>
+      simp only [Option.map_eq_none_iff, minimumExchangeCount_eq_none_iff_coinExchanges_eq_empty,
+        countWith] at hw
+      simp only [ihWithout, countWithout] at hwo
+      simp only [minOption, Option.some.injEq, coinExchanges_cons_of_not_zero_of_le h.1 h.2, hw,
+        Finset.image_empty, Finset.empty_union]
+      grind
+    | .none, .none =>
+      simp only [Option.map_eq_none_iff, minimumExchangeCount_eq_none_iff_coinExchanges_eq_empty,
+        countWith] at hw
+      simp only [minimumExchangeCount_eq_none_iff_coinExchanges_eq_empty, countWithout] at hwo
+      simp [coinExchanges_cons_of_not_zero_of_le h.1 h.2, hw, hwo, minOption]
+
+theorem minimumExchangeCount_le_card_of_mem_coinExchanges {coins : List Nat} {amount : Nat} {exchange : Multiset Nat}
+  (mem : exchange ∈ coinExchanges coins amount) :
+  ∃ count, minimumExchangeCount coins amount = .some count ∧ count ≤ exchange.card := by
+  match h : minimumExchangeCount coins amount with
+  | .none => simp_all [minimumExchangeCount_eq_none_iff_coinExchanges_eq_empty]
+  | .some count =>
+    simp only [Option.some.injEq, exists_eq_left', ge_iff_le]
+    obtain ⟨_, _, _, hmin⟩ := minimumExchangeCount_eq_some_iff_minimal.mp h
+    exact hmin exchange mem
