@@ -8,3 +8,8 @@ name = "ProgramVerifications"
 [[lean_exe]]
 name = "program-verifications"
 root = "Main"
+
+[[require]]
+name = "mathlib"
+scope = "leanprover-community"
+rev = "v4.23.0"
