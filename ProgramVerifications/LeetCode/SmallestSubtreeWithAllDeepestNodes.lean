@@ -42,8 +42,31 @@ where
       | .eq => (root, leftHeight + 1)
       | .gt => (left', leftHeight + 1)
 
+theorem smallestSubtreeWithAllDeepestNodes'.go.eq_height {root : Tree α} :
+  (smallestSubtreeWithAllDeepestNodes'.go root).2 = root.height := by
+  fun_induction smallestSubtreeWithAllDeepestNodes'.go root
+  next => simp
+  next _value left right left' leftHeight eql right' rightHeight eqr cmp ihLeft ihRight =>
+    rw [Nat.compare_eq_lt] at cmp
+    simp
+    grind
+  next _value left right left' leftHeight eql right' rightHeight eqr cmp ihLeft ihRight =>
+    rw [Nat.compare_eq_eq] at cmp
+    simp
+    grind
+  next _value left right left' leftHeight eql right' rightHeight eqr cmp ihLeft ihRight =>
+    rw [Nat.compare_eq_gt] at cmp
+    simp
+    grind
+
 namespace Tree
 
+/-
+We identify a subtree as a path from the root to a node, represented as a list of `TreeAccess`s.
+
+This is because there may be "identical" subtrees (in terms of value equality) at a different postition in the tree,
+while the problem talks about the "referential equality" when identifying subtrees.
+-/
 inductive TreeAccess where
   | left
   | right
@@ -79,13 +102,186 @@ theorem get'_append (as₁ as₂ : List TreeAccess) (tree : Tree α) : get' (as�
     | right => simp [ih]
 
 @[grind]
+theorem get'_ne_nil_of_get'_append_ne_nil {as₁ as₂ : List TreeAccess} {tree : Tree α} (h : tree.get' (as₁ ++ as₂) ≠ .nil) :
+  tree.get' as₁ ≠ .nil := by
+  by_cases eq : tree.get' as₁ = .nil <;> grind
+
+@[grind]
+theorem length_lt_height_of_get'_ne_nil {as : List TreeAccess} {tree : Tree α} (h : tree.get' as ≠ .nil) :
+  as.length < tree.height := by
+  induction as generalizing tree with
+  | nil => cases tree <;> grind [height]
+  | cons a as ih =>
+    cases tree with
+    | nil => grind
+    | node _value left right =>
+      simp only [List.length_cons, height, add_lt_add_iff_right, lt_sup_iff]
+      cases a with
+      | left => exact .inl (ih h)
+      | right => exact .inr (ih h)
+
+@[grind]
+theorem eq_nil_of_get'_leaf_ne_nil {as : List TreeAccess} {value : α} (ne : get' as (.node value .nil .nil) ≠ .nil) :
+  as = [] := by
+  match as with
+  | [] => rfl
+  | .left :: as => simp at ne
+  | .right :: as => simp at ne
+
+@[grind]
 def IsDeepestAccess (root : Tree α) (as : List TreeAccess) : Prop :=
   root.get' as ≠ .nil ∧ ∀ as', root.get' as' ≠ .nil → as'.length ≤ as.length
+
+@[grind]
+theorem ne_nil_of_IsDeepestAccess {root : Tree α} {as : List TreeAccess} (h : root.IsDeepestAccess as) : root ≠ .nil := by
+  grind
+
+def deepestAccess (root : Tree α) : List TreeAccess :=
+  match root with
+  | .nil => []
+  | .node _value .nil .nil => []
+  | .node _value .nil right => .right :: right.deepestAccess
+  | .node _value left .nil => .left :: left.deepestAccess
+  | .node _value left right =>
+    let asLeft := left.deepestAccess
+    let asRight := right.deepestAccess
+    if asLeft.length ≤ asRight.length then
+      .right :: asRight
+    else
+      .left :: asLeft
+
+theorem isDeepestAccess_deepestAccess_of_ne_nil {root : Tree α} (ne : root ≠ .nil) : root.IsDeepestAccess (deepestAccess root) := by
+  fun_induction deepestAccess root
+  next => grind
+  next => grind
+  next _value right ne' ihRight =>
+    have ihRight := ihRight ne'
+    refine ⟨?_, ?_⟩
+    . exact ihRight.1
+    . intro as' h
+      match as' with
+      | [] => simp
+      | .left :: as' => simp at h
+      | .right :: as' =>
+        simp only [get'_cons_right, Tree.right, ne_eq] at h
+        grind
+  next _value left ne' ihLeft =>
+    have ihLeft := ihLeft ne'
+    refine ⟨?_, ?_⟩
+    . exact ihLeft.1
+    . intro as' h
+      match as' with
+      | [] => simp
+      | .left :: as' =>
+        simp only [get'_cons_left, Tree.left, ne_eq] at h
+        grind
+      | .right :: as' => simp at h
+  next _value left right _ neLeft neRight asLeft asRight le ihLeft ihRight =>
+    have ihLeft := ihLeft neLeft
+    have ihRight := ihRight neRight
+    refine ⟨?_, ?_⟩
+    . exact ihRight.1
+    . intro as' h
+      match as' with
+      | [] => simp
+      | .left :: as' =>
+        simp only [get'_cons_left, Tree.left, ne_eq] at h
+        simp only [List.length_cons, add_le_add_iff_right, ge_iff_le]
+        exact Nat.le_trans (ihLeft.2 as' h) le
+      | .right :: as' =>
+        simp only [get'_cons_right, Tree.right, ne_eq] at h
+        simp only [List.length_cons, add_le_add_iff_right, ge_iff_le]
+        exact ihRight.2 as' h
+  next _value left right _ neLeft neRight asLeft asRight nle ihLeft ihRight =>
+    have ihLeft := ihLeft neLeft
+    have ihRight := ihRight neRight
+    refine ⟨?_, ?_⟩
+    . exact ihLeft.1
+    . intro as' h
+      match as' with
+      | [] => simp
+      | .left :: as' =>
+        simp only [get'_cons_left, Tree.left, ne_eq] at h
+        simp only [List.length_cons, add_le_add_iff_right, ge_iff_le]
+        exact ihLeft.2 as' h
+      | .right :: as' =>
+        simp only [get'_cons_right, Tree.right, ne_eq] at h
+        simp only [List.length_cons, add_le_add_iff_right, ge_iff_le]
+        exact Nat.le_trans (ihRight.2 as' h) (by grind)
+
+theorem deepestAccess_length_add_one_eq_height_of_ne_nil {root : Tree α} (ne : root ≠ .nil) : root.deepestAccess.length + 1 = root.height := by
+  fun_induction deepestAccess root <;> grind [Tree.height]
 
 theorem length_eq_of_IsDeepestAccess {root : Tree α} {as₁ as₂ : List TreeAccess}
   (h₁ : root.IsDeepestAccess as₁) (h₂ : root.IsDeepestAccess as₂) :
   as₁.length = as₂.length := by
   grind
+
+@[grind, simp]
+theorem length_add_one_eq_height_of_IsDeepestAccess {root : Tree α} {as : List TreeAccess} (h : root.IsDeepestAccess as) :
+  as.length + 1 = root.height := by
+  have ne := ne_nil_of_IsDeepestAccess h
+  rw [length_eq_of_IsDeepestAccess h (isDeepestAccess_deepestAccess_of_ne_nil ne), deepestAccess_length_add_one_eq_height_of_ne_nil ne]
+
+theorem isDeepestAccess_get_of_isDeepestAccess_append {root : Tree α} {as₁ as₂ : List TreeAccess}
+  (h : root.IsDeepestAccess (as₁ ++ as₂)) :
+  (root.get' as₁).IsDeepestAccess as₂ := by
+  induction as₁ generalizing as₂ root with
+  | nil => grind
+  | cons a as₁ ih =>
+    cases root with
+    | nil => grind
+    | node _value left right =>
+      cases a with
+      | left =>
+        have h' : left.IsDeepestAccess (as₁ ++ as₂) := by
+          refine ⟨?_, ?_⟩
+          . exact h.1
+          . intro as' h'
+            have := h.2 (.left :: as') h'
+            grind
+        exact ih h'
+      | right =>
+        have h' : right.IsDeepestAccess (as₁ ++ as₂) := by
+          refine ⟨?_, ?_⟩
+          . exact h.1
+          . intro as' h'
+            have := h.2 (.right :: as') h'
+            grind
+        exact ih h'
+
+@[grind, simp]
+theorem height_eq_zero_iff_eq_nil {root : Tree α} : root.height = 0 ↔ root = .nil := by
+  induction root <;> grind [height]
+
+theorem leaf_of_isDeepestAccess_nil {root : Tree α} (h : root.IsDeepestAccess []) :
+  ∃ value, root = .node value .nil .nil := by
+  have heightEq : root.height = 1 := (length_add_one_eq_height_of_IsDeepestAccess h).symm
+  match root with
+  | .nil => grind
+  | .node value left right =>
+    simp only [height, Nat.add_eq_right, Nat.max_eq_zero_iff, height_eq_zero_iff_eq_nil] at heightEq
+    simpa using heightEq
+
+@[grind]
+theorem height_ge_of_isDeepestAccess_cons_left {root : Tree α} {as : List TreeAccess} (h : root.IsDeepestAccess (.left :: as)) :
+  root.left.height ≥ root.right.height := by
+  have h' : root.left.IsDeepestAccess as := isDeepestAccess_get_of_isDeepestAccess_append (as₁ := [.left]) (as₂ := as) h
+  have eqLeft : root.left.height = as.length + 1 := by grind
+  have eq : root.height = as.length + 2 := by grind
+  match root with
+  | .nil => grind
+  | .node _value left right => simp_all
+
+@[grind]
+theorem height_le_of_isDeepestAccess_cons_right {root : Tree α} {as : List TreeAccess} (h : root.IsDeepestAccess (.right :: as)) :
+  root.left.height ≤ root.right.height := by
+  have h' : root.right.IsDeepestAccess as := isDeepestAccess_get_of_isDeepestAccess_append (as₁ := [.right]) (as₂ := as) h
+  have eqRight : root.right.height = as.length + 1 := by grind
+  have eq : root.height = as.length + 2 := by grind
+  match root with
+  | .nil => grind
+  | .node _value left right => simp_all
 
 @[grind]
 def IsAncestorOfDeepestAccesses (root : Tree α) (as : List TreeAccess) : Prop :=
