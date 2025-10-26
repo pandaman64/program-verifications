@@ -345,36 +345,6 @@ theorem isAncestorOfDeepestAccesses_snoc_right_of_isAncestorOfDeepestAccesses_of
   | .left :: as'' => grind
   | .right :: as'' => exact ⟨as'', by grind⟩
 
-theorem ge_height_of_isAncestorOfDeepestAccesses_snoc_left_of_ne_nil {root : Tree α} {as : List TreeAccess}
-  (iadaL : root.IsAncestorOfDeepestAccesses (as ++ [.left])) (ne : root ≠ .nil) :
-  (root.get' as).left.height ≥ (root.get' as).right.height := by
-  by_contra nge
-  have iada : root.IsAncestorOfDeepestAccesses as := by
-    intro as' ida'
-    exact List.IsPrefix.trans (by grind) (iadaL as' ida')
-  have iadaR : root.IsAncestorOfDeepestAccesses (as ++ [.right]) :=
-    isAncestorOfDeepestAccesses_snoc_right_of_isAncestorOfDeepestAccesses_of_lt_height iada (by grind)
-  have f (as' : List TreeAccess) (ida : root.IsDeepestAccess as') : False := by
-    obtain ⟨asL, eqL⟩ := iadaL as' ida
-    obtain ⟨asR, eqR⟩ := iadaR as' ida
-    grind
-  exact f root.deepestAccess (isDeepestAccess_deepestAccess_of_ne_nil ne)
-
-theorem le_height_of_isAncestorOfDeepestAccesses_snoc_right_of_ne_nil {root : Tree α} {as : List TreeAccess}
-  (iadaR : root.IsAncestorOfDeepestAccesses (as ++ [.right])) (ne : root ≠ .nil) :
-  (root.get' as).left.height ≤ (root.get' as).right.height := by
-  by_contra nle
-  have iada : root.IsAncestorOfDeepestAccesses as := by
-    intro as' ida'
-    exact List.IsPrefix.trans (by grind) (iadaR as' ida')
-  have iadaL : root.IsAncestorOfDeepestAccesses (as ++ [.left]) :=
-    isAncestorOfDeepestAccesses_snoc_left_of_isAncestorOfDeepestAccesses_of_gt_height iada (by grind)
-  have f (as' : List TreeAccess) (ida : root.IsDeepestAccess as') : False := by
-    obtain ⟨asL, eqL⟩ := iadaL as' ida
-    obtain ⟨asR, eqR⟩ := iadaR as' ida
-    grind
-  exact f root.deepestAccess (isDeepestAccess_deepestAccess_of_ne_nil ne)
-
 theorem not_isAncestorOfDeepestAccesses_snoc_of_isAncestorOfDeepestAccesses_of_eq_height_of_ne_nil {root : Tree α} {as : List TreeAccess} {a : TreeAccess}
   (iada : root.IsAncestorOfDeepestAccesses as) (eq : (root.get' as).left.height = (root.get' as).right.height) (ne : (root.get' as) ≠ .nil) :
   ¬root.IsAncestorOfDeepestAccesses (as ++ [a]) := by
@@ -452,18 +422,6 @@ theorem isPrefix_of_isAncestorOfDeepestAccesses_of_ne_nil {root : Tree α} {as�
 def IsLongestAncestorOfDeepestAccesses (root : Tree α) (as : List TreeAccess) : Prop :=
   root.IsAncestorOfDeepestAccesses as ∧ ∀ as', root.IsAncestorOfDeepestAccesses as' → as'.length ≤ as.length
 
-theorem prefix_of_isAncestorOfDeepestAccesses_of_isAncestorOfDeepestAccesses_of_ne_nil {root : Tree α} {as₁ as₂ : List TreeAccess}
-  (iada₁ : root.IsAncestorOfDeepestAccesses as₁) (ilada₂ : root.IsLongestAncestorOfDeepestAccesses as₂) (ne : root ≠ .nil) :
-  as₁ <+: as₂ := by
-  cases isPrefix_of_isAncestorOfDeepestAccesses_of_ne_nil iada₁ ilada₂.1 ne with
-  | inl h => exact h
-  | inr h =>
-    have := ilada₂.2 _ iada₁
-    obtain ⟨as', eq'⟩ := h
-    match as' with
-    | [] => grind
-    | _ :: _ => grind
-
 theorem isAncestorOfDeepestAccesses_eq_height_of_isLongestAncestorOfDeepestAccesses {root : Tree α} {as : List TreeAccess}
   (ilada : root.IsLongestAncestorOfDeepestAccesses as) :
   root.IsAncestorOfDeepestAccesses as ∧ (root.get' as).left.height = (root.get' as).right.height := by
@@ -495,56 +453,7 @@ theorem isLongestAncestorOfDeepestAccesses_of_isAncestorOfDeepestAccesses_of_eq_
       grind
   | inr h => grind
 
-def longestAncestorOfDeepestAccesses (root : Tree α) : List TreeAccess :=
-  go []
-where
-  go (as : List TreeAccess) : List TreeAccess :=
-    match h : root.get' as with
-    | .nil => as
-    | .node _value left right =>
-      have : as.length < root.height := by grind
-      match Ord.compare left.height right.height with
-      | .lt => go (as ++ [.right])
-      | .eq => as
-      | .gt => go (as ++ [.left])
-  termination_by root.height - as.length
-
-theorem isLongestAncestorOfDeepestAccesses_longestAncestorOfDeepestAccesses_go_of_isAncestorOfDeepestAccesses_of_ne_nil {root : Tree α} {as : List TreeAccess}
-  (iada : root.IsAncestorOfDeepestAccesses as) (ne : root.get' as ≠ .nil) :
-  IsLongestAncestorOfDeepestAccesses root (longestAncestorOfDeepestAccesses.go root as) := by
-  fun_induction longestAncestorOfDeepestAccesses.go root as
-  next => grind
-  next as _value left right h _ lt ih =>
-    rw [Nat.compare_eq_lt] at lt
-    have iada' := isAncestorOfDeepestAccesses_snoc_right_of_isAncestorOfDeepestAccesses_of_lt_height iada (h ▸ lt)
-    exact ih iada' (by grind)
-  next as _value left right h _ eq =>
-    rw [Nat.compare_eq_eq] at eq
-    exact isLongestAncestorOfDeepestAccesses_of_isAncestorOfDeepestAccesses_of_eq_height_of_ne_nil iada (h ▸ eq) ne
-  next as _value left right h _ gt ih =>
-    rw [Nat.compare_eq_gt] at gt
-    have iada' := isAncestorOfDeepestAccesses_snoc_left_of_isAncestorOfDeepestAccesses_of_gt_height iada (h ▸ gt)
-    exact ih iada' (by grind)
-
-theorem isLongestAncestorOfDeepestAccesses_longestAncestorOfDeepestAccesses_of_isAncestorOfDeepestAccesses_of_ne_nil {root : Tree α}
-  (ne : root ≠ .nil) :
-  IsLongestAncestorOfDeepestAccesses root (longestAncestorOfDeepestAccesses root) := by
-  have iada : root.IsAncestorOfDeepestAccesses [] := by grind
-  exact isLongestAncestorOfDeepestAccesses_longestAncestorOfDeepestAccesses_go_of_isAncestorOfDeepestAccesses_of_ne_nil iada ne
-
 end Tree
-
-def List.revInductionOn {C : List α → Sort*} (l : List α)
-  (nil : C nil)
-  (snoc : ∀ (l : List α) (x : α), C l → C (l ++ [x])) :
-  C l := go [] l nil rfl
-where
-  go (l₁ l₂ : List α) (accum : C l₁) (h : l₁ ++ l₂ = l) : C l :=
-    match l₂ with
-    | [] =>
-      have h' : l₁ = l := by grind
-      h' ▸ accum
-    | x :: x₂ => go (l₁ ++ [x]) x₂ (snoc l₁ x accum) (by grind)
 
 theorem smallestSubtreeWithAllDeepestNodes_eq_get_longestAncestorOfDeepestAccesses_of_isAncestorOfDeepestAccesses_of_ne_nil
   {root : Tree α} {as : List Tree.TreeAccess} (iada : root.IsAncestorOfDeepestAccesses as) (ne : root.get' as ≠ .nil) :
