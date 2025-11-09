@@ -90,13 +90,46 @@ theorem distance_lt_distance_stepPoint_of_ne (current target : Int × Int) (h : 
     else
       grind
 
+@[grind]
 def minMovementsToVisitNext (current target : Int × Int) : List (Int × Int) :=
   if h : current = target then
-    []
+    [current]
   else
     let next := stepPoint current target
     have : distance next target < distance current target := distance_lt_distance_stepPoint_of_ne current target h
     current :: minMovementsToVisitNext next target
 termination_by distance current target
+
+theorem isChain_isNextPoint_minMovementsToVisitNext (current target : Int × Int) :
+  IsChain IsNextPoint (minMovementsToVisitNext current target) := by
+  fun_induction minMovementsToVisitNext current target
+  next => simp
+  next current h next _ ih => grind
+
+theorem minMovementsToVisitNext_head? (current target : Int × Int) :
+  (minMovementsToVisitNext current target).head? = .some current := by
+  fun_cases minMovementsToVisitNext current target <;> simp
+
+theorem minMovementsToVisitNext_getLast? (current target : Int × Int) :
+  (minMovementsToVisitNext current target).getLast? = .some target := by
+  fun_induction minMovementsToVisitNext current target
+  next => simp
+  next current _ next _ ih => simp [List.getLast?_cons, ih]
+
+@[grind, simp]
+theorem minMovementsToVisitNext_eq (current target : Int × Int) (h : current = target) :
+  minMovementsToVisitNext current target = [current] := by
+  simp [minMovementsToVisitNext, h]
+
+theorem minMovementsToVisitNext_ne (current target : Int × Int) (h : current ≠ target) :
+  ∃ ps, minMovementsToVisitNext current target = current :: ps ++ [target] := by
+  fun_induction minMovementsToVisitNext current target
+  next => grind
+  next current _ next _ ih =>
+    if h' : next = target then
+      simp [h']
+    else
+      obtain ⟨ps, eq⟩ := ih h'
+      exact ⟨next :: ps, by simp [eq]⟩
 
 end Specification
