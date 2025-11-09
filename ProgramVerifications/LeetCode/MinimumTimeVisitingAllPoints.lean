@@ -93,7 +93,7 @@ theorem distance_lt_distance_stepPoint_of_ne (current target : Int × Int) (h : 
 @[grind]
 def minMovementsToVisitNext (current target : Int × Int) : List (Int × Int) :=
   if h : current = target then
-    [current]
+    []
   else
     let next := stepPoint current target
     have : distance next target < distance current target := distance_lt_distance_stepPoint_of_ne current target h
@@ -107,29 +107,74 @@ theorem isChain_isNextPoint_minMovementsToVisitNext (current target : Int × Int
   next current h next _ ih => grind
 
 theorem minMovementsToVisitNext_head? (current target : Int × Int) :
-  (minMovementsToVisitNext current target).head? = .some current := by
-  fun_cases minMovementsToVisitNext current target <;> simp
+  (minMovementsToVisitNext current target).head? = if current = target then .none else .some current := by
+  fun_cases minMovementsToVisitNext current target <;> grind
 
-theorem minMovementsToVisitNext_getLast? (current target : Int × Int) :
-  (minMovementsToVisitNext current target).getLast? = .some target := by
-  fun_induction minMovementsToVisitNext current target
-  next => simp
-  next current _ next _ ih => simp [List.getLast?_cons, ih]
-
-@[grind, simp]
-theorem minMovementsToVisitNext_eq (current target : Int × Int) (h : current = target) :
-  minMovementsToVisitNext current target = [current] := by
-  simp [minMovementsToVisitNext, h]
-
-theorem minMovementsToVisitNext_ne (current target : Int × Int) (h : current ≠ target) :
-  ∃ ps, minMovementsToVisitNext current target = current :: ps ++ [target] := by
+theorem isNextPoint_minMovementsToVisitNext_getLast?_target (current last target : Int × Int)
+  (h : last ∈ (minMovementsToVisitNext current target).getLast?) :
+  IsNextPoint last target := by
   fun_induction minMovementsToVisitNext current target
   next => grind
-  next current _ next _ ih =>
-    if h' : next = target then
-      simp [h']
-    else
-      obtain ⟨ps, eq⟩ := ih h'
-      exact ⟨next :: ps, by simp [eq]⟩
+  next current h' next _ ih =>
+    simp only [getLast?_cons, Option.mem_def, Option.some.injEq] at h
+    match eq : (minMovementsToVisitNext next target).getLast? with
+    | .some last' => simp_all
+    | .none =>
+      simp only [eq, Option.getD_none] at h
+      rw [getLast?_eq_none_iff] at eq
+      unfold minMovementsToVisitNext at eq
+      simp only [dite_eq_ite, ite_eq_left_iff, reduceCtorEq, imp_false, Decidable.not_not] at eq
+      exact h ▸ eq ▸ isNextPoint_stepPoint current target
+
+-- theorem minMovementsToVisitNext_getLast? (current target : Int × Int) :
+--   (minMovementsToVisitNext current target).getLast? = if current = target then .none else .some target := by
+--   fun_induction minMovementsToVisitNext current target
+--   next => simp
+--   next current h next _ ih => simp [List.getLast?_cons, ih, h]
+
+-- @[grind, simp]
+-- theorem minMovementsToVisitNext_eq (current target : Int × Int) (h : current = target) :
+--   minMovementsToVisitNext current target = [current] := by
+--   simp [minMovementsToVisitNext, h]
+
+-- theorem minMovementsToVisitNext_ne (current target : Int × Int) (h : current ≠ target) :
+--   ∃ ps, minMovementsToVisitNext current target = current :: ps ++ [target] := by
+--   fun_induction minMovementsToVisitNext current target
+--   next => grind
+--   next current _ next _ ih =>
+--     if h' : next = target then
+--       simp [h']
+--     else
+--       obtain ⟨ps, eq⟩ := ih h'
+--       exact ⟨next :: ps, by simp [eq]⟩
+
+@[grind]
+def minMovementsToVisitAllPoints (points : List (Int × Int)) : List (Int × Int) :=
+  match points with
+  | [] => []
+  | [current] => [current]
+  | current :: next :: points => minMovementsToVisitNext current next ++ minMovementsToVisitAllPoints (next :: points)
+
+theorem minMovementsToVisitAllPoints_head? (points : List (Int × Int)) :
+  (minMovementsToVisitAllPoints points).head? = points.head? := by
+  fun_induction minMovementsToVisitAllPoints points
+  next => grind
+  next => grind
+  next current next points ih => grind
+
+theorem isChain_isNextPoint_minMovementsToVisitAllPoints (points : List (Int × Int)) :
+  IsChain IsNextPoint (minMovementsToVisitAllPoints points) := by
+  fun_induction minMovementsToVisitAllPoints points
+  next => simp
+  next => simp
+  next current next points ih =>
+    apply IsChain.append (isChain_isNextPoint_minMovementsToVisitNext _ _) ih
+    intro x hx y hy
+    simp only [minMovementsToVisitAllPoints_head?, head?_cons, Option.mem_def,
+      Option.some.injEq] at hy
+    exact hy ▸ isNextPoint_minMovementsToVisitNext_getLast?_target current x next hx
+
+#check IsChain.append
+#check IsChain.append_overlap
 
 end Specification
