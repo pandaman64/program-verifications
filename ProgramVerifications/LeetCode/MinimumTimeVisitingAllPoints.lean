@@ -35,32 +35,32 @@ def step (current target : Int) : Int :=
   | .eq => current
   | .gt => current - 1
 
-@[grind]
+@[grind =]
 theorem natAbs_step_of_eq (current target : Int) (h : current = target) :
   ((step current target) - target).natAbs = 0 := by
   simp [step, h]
 
-@[grind]
+@[grind =]
 theorem Int.natAbs_eq_toNat_nonneg (n : Int) (h : 0 ≤ n) : n.natAbs = n.toNat := by
   grind
 
-@[grind]
+@[grind =]
 theorem Int.natAbs_eq_toNat_nonpos (n : Int) (h : n ≤ 0) : n.natAbs = (-n).toNat := by
   grind
 
-@[grind]
+@[grind =]
 theorem natAbs_step_of_lt (current target : Int) (h : current < target) :
   ((step current target) - target).natAbs + 1 = (current - target).natAbs := by
   simp only [step, Int.compare_eq_lt.mpr h]
   grind
 
-@[grind]
+@[grind =]
 theorem natAbs_step_of_gt (current target : Int) (h : target < current) :
   ((step current target) - target).natAbs + 1 = (target - current).natAbs := by
   simp only [step, Int.compare_eq_gt.mpr h]
   grind
 
-@[grind]
+@[grind =]
 theorem natAbs_step_of_ne (current target : Int) (h : current ≠ target) :
   ((step current target) - target).natAbs + 1 = (target - current).natAbs := by
   grind
@@ -72,12 +72,12 @@ def stepPoint (current target : Int × Int) : Int × Int :=
   else
     (step current.1 target.1, step current.2 target.2)
 
-@[grind]
+@[grind .]
 theorem isNextPoint_stepPoint (current target : Int × Int) : IsNextPoint current (stepPoint current target) := by
   unfold stepPoint step
   grind
 
-@[grind]
+@[grind .]
 theorem distance_lt_distance_stepPoint_of_ne (current target : Int × Int) (h : current ≠ target) :
   distance (stepPoint current target) target < distance current target := by
   simp only [distance, stepPoint, h, ↓reduceIte]
