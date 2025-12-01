@@ -3,22 +3,6 @@ import Mathlib
 open Relation (ReflTransGen)
 open Std (HashSet)
 
-namespace Std.HashSet
-
-variable {α : Type*} [Hashable α] [DecidableEq α]
-
-def toFinset (s : HashSet α) : Finset α :=
-  s.fold (init := ∅) (fun acc x => Insert.insert x acc)
-
-theorem mem_iff_mem_toFinset {s : HashSet α} {x : α} : x ∈ s ↔ x ∈ s.toFinset := by
-  simp [toFinset, fold_eq_foldl_toList, toList]
-  sorry
-
-#synth Insert α (HashSet α)
-#check Finset.induction
-
-end Std.HashSet
-
 namespace DFS
 
 structure Graph (V : Type*) where
@@ -112,14 +96,14 @@ theorem reachable_of_mem_dfs {G : Graph V} {u v : V} (h : v ∈ dfs G ∅ [u]) :
 theorem reachable_iff_mem_dfs {G : Graph V} {u v : V} : G.Reachable u v ↔ v ∈ dfs G ∅ [u] :=
   ⟨mem_dfs_of_reachable, reachable_of_mem_dfs⟩
 
-partial def dfsHash [Hashable V] (G : Graph V) (visited : HashSet V) (stack : List V) : HashSet V :=
-  match stack with
-  | [] => visited
-  | v :: stack =>
-    if v ∈ visited then
-      dfsHash G visited stack
-    else
-      -- Here, we want something like `v ∉ visited → visited.size < Fintype.card V`.
-      dfsHash G (visited.insert v) (G.adjList v ++ stack)
+-- partial def dfsHash [Hashable V] (G : Graph V) (visited : HashSet V) (stack : List V) : HashSet V :=
+--   match stack with
+--   | [] => visited
+--   | v :: stack =>
+--     if v ∈ visited then
+--       dfsHash G visited stack
+--     else
+--       -- Here, we want something like `v ∉ visited → visited.size < Fintype.card V`.
+--       dfsHash G (visited.insert v) (G.adjList v ++ stack)
 
 end DFS
